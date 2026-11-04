@@ -19,5 +19,6 @@ __all__ = [
     "DOMAIN",
     "MIN_SCAN_INTERVAL",
 ]
-BASE = "https://nbpower.com"
+BASE = "https://www.nbpower.com"
+LOGIN_PATH = "/Auth/WebLogin.aspx"
 WIDGET_API = "https://nbp-svc.smartcmobile.com/WidgetAPI"

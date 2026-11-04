@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 import aiohttp
 from bs4 import BeautifulSoup
 
-from .const import BASE, WIDGET_API
+from .const import BASE, LOGIN_PATH, WIDGET_API
 
 VALID_MODES = {"Mi", "H", "D", "M", "S"}  # 15min, Hourly, Daily, Monthly, Seasonal
 VALID_TYPES = {"K", "D"}                  # K (kWh/kW), D (dollars)
@@ -57,6 +57,7 @@ class NBPowerClient:
         headers = {"User-Agent": "Mozilla/5.0", "Referer": BASE + "/", "Origin": BASE}
         async with self.session.get(default_url, headers=headers) as r:
             html = await r.text()
+            page_url = str(r.url)
         soup = BeautifulSoup(html, "html.parser")
         form = soup.find("form")
         if not form:
@@ -68,17 +69,18 @@ class NBPowerClient:
             "__EVENTVALIDATION": formfields.get("__EVENTVALIDATION", ""),
             "btnEnglish": "English",
         }
-        post_headers = {**headers, "Content-Type": "application/x-www-form-urlencoded", "Referer": default_url}
-        action = form.get("action") or default_url
-        post_url = urljoin(default_url, action)
+        post_headers = {**headers, "Content-Type": "application/x-www-form-urlencoded", "Referer": page_url}
+        action = form.get("action") or page_url
+        post_url = urljoin(page_url, action)
         async with self.session.post(post_url, data=data, headers=post_headers, allow_redirects=True) as r2:
             return r2.status in (200, 302)
 
     async def login(self, username: str, password: str) -> bool:
-        login_url = f"{BASE}/auth/weblogin.aspx"
+        login_url = f"{BASE}{LOGIN_PATH}"
         headers = {"User-Agent": "Mozilla/5.0", "Referer": login_url, "Origin": BASE}
         async with self.session.get(login_url, headers=headers) as r:
             html = await r.text()
+            page_url = str(r.url)
         soup = BeautifulSoup(html, "html.parser")
         form = soup.find("form")
         if not form:
@@ -115,12 +117,17 @@ class NBPowerClient:
             if k in data:
                 data[k] = ""
 
-        post_headers = {**headers, "Content-Type": "application/x-www-form-urlencoded"}
-        action = form.get("action") or login_url
-        post_url = urljoin(login_url, action)
+        post_headers = {
+            **headers,
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": page_url,
+        }
+        action = form.get("action") or page_url
+        post_url = urljoin(page_url, action)
         async with self.session.post(post_url, data=data, headers=post_headers, allow_redirects=True) as r2:
             html2 = await r2.text()
-            if "weblogin.aspx" in str(r2.url).lower() or "Cookies required" in html2:
+            final_url = str(r2.url).lower()
+            if "weblogin.aspx" in final_url or "Cookies required" in html2:
                 return False
             return True
 

@@ -20,7 +20,8 @@ from typing import Optional, Dict, Any
 import aiohttp
 from bs4 import BeautifulSoup  # pip install aiohttp beautifulsoup4
 
-BASE = "https://nbpower.com"
+BASE = "https://www.nbpower.com"
+LOGIN_PATH = "/Auth/WebLogin.aspx"
 WIDGET_API = "https://nbp-svc.smartcmobile.com/WidgetAPI"
 
 VALID_MODES = {"Mi", "H", "D", "M", "S"}   # 15min, Hourly, Daily, Monthly, Seasonal
@@ -64,6 +65,7 @@ class NBPowerClient:
 
         async with self.session.get(default_url, headers=headers) as r:
             html = await r.text()
+            page_url = str(r.url)
 
         soup = BeautifulSoup(html, "html.parser")
         form = soup.find("form")
@@ -87,11 +89,11 @@ class NBPowerClient:
         post_headers = {
             **headers,
             "Content-Type": "application/x-www-form-urlencoded",
-            "Referer": default_url,
+            "Referer": page_url,
         }
 
-        action = form.get("action") or default_url
-        post_url = urljoin(default_url, action)
+        action = form.get("action") or page_url
+        post_url = urljoin(page_url, action)
         async with self.session.post(
             post_url, data=data, headers=post_headers, allow_redirects=True
         ) as r2:
@@ -104,7 +106,7 @@ class NBPowerClient:
         """
         WebForms login: scrape inputs, POST back with creds (keeps session cookies).
         """
-        login_url = f"{BASE}/auth/weblogin.aspx"
+        login_url = f"{BASE}{LOGIN_PATH}"
         headers = {
             "User-Agent": "Mozilla/5.0",
             "Referer": login_url,
@@ -113,7 +115,9 @@ class NBPowerClient:
 
         async with self.session.get(login_url, headers=headers) as r:
             html = await r.text()
+            page_url = str(r.url)
             print("SessionId (before login):", self._get_session_id())
+            print("login form page:", page_url)
 
         soup = BeautifulSoup(html, "html.parser")
         form = soup.find("form")
@@ -167,10 +171,11 @@ class NBPowerClient:
         post_headers = {
             **headers,
             "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": page_url,
         }
 
-        action = form.get("action") or login_url
-        post_url = urljoin(login_url, action)
+        action = form.get("action") or page_url
+        post_url = urljoin(page_url, action)
         async with self.session.post(
             post_url, data=data, headers=post_headers, allow_redirects=True
         ) as r2:
